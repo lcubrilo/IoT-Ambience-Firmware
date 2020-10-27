@@ -1,5 +1,3 @@
-#include <Adafruit_BLE_UART.h>
-
 #include <Adafruit_Sensor.h>
 
 #include <Adafruit_BME680.h>
