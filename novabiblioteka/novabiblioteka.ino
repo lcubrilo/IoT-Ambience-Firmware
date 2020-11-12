@@ -7,17 +7,18 @@
 BLEPeripheral blutut = BLEPeripheral(46, 2, 48);
   BLEService ts = BLEService("CCC0");
   BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
-  BLEDescriptor td = BLEDescriptor("2901", "Temp Celsius");
+  BLEDescriptor td = BLEDescriptor("2901", "Atmosphere: Temp, Humi, Pres");
     
   BLEService hs = BLEService("DDD0");
-  BLEIntCharacteristic hc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
+  BLEIntCharacteristic hc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
   BLEDescriptor hd = BLEDescriptor("2901", "Humidity Percent");
   
   BLEService ps = BLEService("EEE0");
-  BLEIntCharacteristic pc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
+  BLEIntCharacteristic pc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
   BLEDescriptor pd = BLEDescriptor("2901", "Pressure mbar");
 
 Adafruit_BME680 senzor = Adafruit_BME680();
+int previousMilis = 0;
 
 void blututSetup(){
 
@@ -49,16 +50,17 @@ void sendValues(int t, int p, int h){
   tc.setValue(t);
   pc.setValue(p);
   hc.setValue(h);
-  
-  Serial.println("poslao na ble");
+  Serial.println("Poslao na BLE.");
 }
 
 bool BLEconnected = false;
 void connectToBLE(){
   BLEconnected=true;
+  Serial.println("\nPovezan.");
 }
 void disconnectFromBLE(){
   BLEconnected=false;
+  Serial.println("Odvezan.");
 }
 
 void setup() {
@@ -68,24 +70,20 @@ void setup() {
   senzor.begin();
 }
 
-int previousMilis = 0;
 void loop() {
-  
   blutut.poll();
   int currentMilis = millis(); //How much time has passed
-  if(currentMilis - previousMilis < 1000) //Not enough time since last time? skip.
-    return
-  previousMilis = currentMilis;
+  if(currentMilis - previousMilis < 10000 || !BLEconnected) //Not enough time since last time? skip.
+    return;
+  previousMilis = currentMilis;    
   
-  Serial.println("e");
-  
-  
+  Serial.println("loop");
+
   //Read off of sensor
   int t = int(senzor.readTemperature()), 
-      p = int(senzor.readPressure()/1000),
+      p = int(senzor.readPressure()/100),
       h = int(senzor.readHumidity());
-  Serial.println("ucitao sa senzora");  
-  
-  if(BLEconnected)
-    sendValues(t,p,h);
+  String ispis = "Senzor: " + (String)t + " C, " + (String)p + " mbar, " + (String)h + "% ";
+  Serial.println(ispis);  
+  sendValues(t,p,h);
 }
