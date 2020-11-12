@@ -5,30 +5,23 @@
 #include <bme680_defs.h>
 
 BLEPeripheral blutut = BLEPeripheral(46, 2, 48);
-BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
-BLEIntCharacteristic pc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
-BLEIntCharacteristic hc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
-
-Adafruit_BME680 senzor = Adafruit_BME680();
-
-void blututConnectHandler(BLECentral& central) {
-  Serial.print(F("Connected event, central: "));
-  Serial.println(central.address());
-}
-void blututDisconnectHandler(BLECentral& central) {
-  Serial.print(F("Disconnected event, central: "));
-  Serial.println(central.address());
-}
-void blututSetup(){
   BLEService ts = BLEService("CCC0");
+  BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
   BLEDescriptor td = BLEDescriptor("2901", "Temp Celsius");
-  
+    
   BLEService hs = BLEService("DDD0");
+  BLEIntCharacteristic hc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
   BLEDescriptor hd = BLEDescriptor("2901", "Humidity Percent");
   
   BLEService ps = BLEService("EEE0");
+  BLEIntCharacteristic pc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
   BLEDescriptor pd = BLEDescriptor("2901", "Pressure mbar");
-  blutut.setLocalName("xdD2");
+
+Adafruit_BME680 senzor = Adafruit_BME680();
+
+void blututSetup(){
+
+  blutut.setLocalName("ARDuino3");
 
   blutut.setAdvertisedServiceUuid(ts.uuid());
   blutut.addAttribute(ts);
@@ -45,8 +38,8 @@ void blututSetup(){
   blutut.addAttribute(pc);
   blutut.addAttribute(pd);
 
-  blutut.setEventHandler(BLEConnected, blututConnectHandler);
-  blutut.setEventHandler(BLEDisconnected, blututDisconnectHandler);
+  blutut.setEventHandler(BLEConnected, connectToBLE);
+  blutut.setEventHandler(BLEDisconnected, disconnectFromBLE);
 
   blutut.begin();
   Serial.println("setapovao");
@@ -73,20 +66,19 @@ void setup() {
   Serial.println("EEEE");
   blututSetup();
   senzor.begin();
-  blutut.setEventHandler(BLEConnected, connectToBLE);
-  blutut.setEventHandler(BLEDisconnected, disconnectFromBLE);
 }
 
 int previousMilis = 0;
 void loop() {
-    
+  
+  blutut.poll();
   int currentMilis = millis(); //How much time has passed
   if(currentMilis - previousMilis < 1000) //Not enough time since last time? skip.
     return
   previousMilis = currentMilis;
   
   Serial.println("e");
-  blutut.poll();
+  
   
   //Read off of sensor
   int t = int(senzor.readTemperature()), 
