@@ -5,22 +5,25 @@
 #include <bme680_defs.h>
 
 BLEPeripheral blutut = BLEPeripheral(46, 2, 48);
-  BLEService ts = BLEService("CCC0");
-  BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
-  BLEDescriptor td = BLEDescriptor("2901", "Atmosphere: Temp, Humi, Pres");
-    
-  BLEService hs = BLEService("DDD0");
-  BLEIntCharacteristic hc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
-  BLEDescriptor hd = BLEDescriptor("2901", "Humidity Percent");
-  
-  BLEService ps = BLEService("EEE0");
-  BLEIntCharacteristic pc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
-  BLEDescriptor pd = BLEDescriptor("2901", "Pressure mbar");
+BLEService ts = BLEService("CCC0");
+BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
+BLEDescriptor td = BLEDescriptor("2901", "Atmosphere: Temp, Humi, Pres");
+
+BLEService hs = BLEService("DDD0");
+BLEIntCharacteristic hc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
+BLEDescriptor hd = BLEDescriptor("2901", "Humidity Percent");
+//
+BLEService ps = BLEService("EEE0");
+BLEIntCharacteristic pc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
+BLEDescriptor pd = BLEDescriptor("2901", "Pressure mbar");
 
 Adafruit_BME680 senzor = Adafruit_BME680();
-int previousMilis = 0;
+int tPreviousMillis = 0;
+int hPreviousMillis = 0;
+int pPreviousMillis = 0;
+int i = 0;
 
-void blututSetup(){
+void blututSetup() {
 
   blutut.setLocalName("ARDuino3");
 
@@ -46,20 +49,20 @@ void blututSetup(){
   Serial.println("setapovao");
 }
 
-void sendValues(int t, int p, int h){  
+void sendValues(int t, int p, int h) {
   tc.setValue(t);
-  pc.setValue(p);
+ pc.setValue(p);
   hc.setValue(h);
   Serial.println("Poslao na BLE.");
 }
 
 bool BLEconnected = false;
-void connectToBLE(){
-  BLEconnected=true;
+void connectToBLE() {
+  BLEconnected = true;
   Serial.println("\nPovezan.");
 }
-void disconnectFromBLE(){
-  BLEconnected=false;
+void disconnectFromBLE() {
+  BLEconnected = false;
   Serial.println("Odvezan.");
 }
 
@@ -73,17 +76,34 @@ void setup() {
 void loop() {
   blutut.poll();
   int currentMilis = millis(); //How much time has passed
-  if(currentMilis - previousMilis < 10000 || !BLEconnected) //Not enough time since last time? skip.
-    return;
-  previousMilis = currentMilis;    
-  
-  Serial.println("loop");
-
-  //Read off of sensor
-  int t = int(senzor.readTemperature()), 
-      p = int(senzor.readPressure()/100),
-      h = int(senzor.readHumidity());
-  String ispis = "Senzor: " + (String)t + " C, " + (String)p + " mbar, " + (String)h + "% ";
-  Serial.println(ispis);  
-  sendValues(t,p,h);
+  if (currentMilis - tPreviousMillis > 5500 && BLEconnected) //Not enough time since last time? skip.
+  {
+    int t = int(senzor.readTemperature());
+    tc.setValue(t);
+    Serial.print("Sent tc: ");
+    Serial.print(t, HEX);
+    Serial.print(" ");
+    Serial.println(t);
+    tPreviousMillis = currentMilis;
+  } 
+  if (currentMilis - pPreviousMillis > 6000 && BLEconnected)
+  {
+    int p = int(senzor.readPressure()/100);
+    pc.setValue(p);
+    Serial.print("Sent pc: ");
+    Serial.print(p, HEX);
+    Serial.print(" ");
+    Serial.println(p);
+    pPreviousMillis = currentMilis;
+  } 
+  if (currentMilis - hPreviousMillis > 6500 && BLEconnected)
+  {
+    int h = int(senzor.readHumidity());
+    hc.setValue(h);
+    Serial.print("Sent hc: ");
+    Serial.print(h, HEX);
+    Serial.print(" ");
+    Serial.println(h);
+    hPreviousMillis = currentMilis;
+  }
 }
