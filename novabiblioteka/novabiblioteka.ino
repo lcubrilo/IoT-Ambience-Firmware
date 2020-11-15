@@ -1,61 +1,77 @@
+/****************************************
+ * Title:
+ * Firmware for the Arduino MEGA board.
+ * 
+ * Part 1: Input
+ * Sensors measure air characteristics.
+ * Using mikroE's "Environment click" with Bosch's BME680 environmental sensor
+ * 
+ * Part 2: Output
+ * Sending the values over BLE 
+ * Using mikroE's "BLE P click" with Nordic's nRF8001 chip 
+ * 
+ * Credits:
+ * Made possible by Execom and their amazing IoT team, through an internship.
+ * They provided the initial project idea, hardware, guidance and 
+ * software support and bugfixes whenever necessary.
+ * 
+ * Coded by Luka Čubrilo.
+ ****************************************/
+ 
 #include <BLEPeripheral.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME680.h>
 #include <bme680.h>
 #include <bme680_defs.h>
 
-BLEPeripheral blutut = BLEPeripheral(46, 2, 48);
+//In this example we have 3 characteristics:
+//Temperature, pressure and humidity
+#define NO_OF_CHARS 3 
+
+//BLE setting up that couldn't have been tucked in the function
+BLEPeripheral bluetoothLE = BLEPeripheral(46, 2, 48);
 BLEService ts = BLEService("CCC0");
 BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
-BLEDescriptor td = BLEDescriptor("2901", "Atmosphere: Temp, Humi, Pres");
+BLEDescriptor td = BLEDescriptor("2901", "Temperature; Degrees Celsius");
 
 BLEService hs = BLEService("DDD0");
 BLEIntCharacteristic hc = BLEIntCharacteristic("DDD1", BLERead | BLENotify);
-BLEDescriptor hd = BLEDescriptor("2901", "Humidity Percent");
-//
+BLEDescriptor hd = BLEDescriptor("2901", "Humidity; Percent");
+
 BLEService ps = BLEService("EEE0");
 BLEIntCharacteristic pc = BLEIntCharacteristic("EEE1", BLERead | BLENotify);
-BLEDescriptor pd = BLEDescriptor("2901", "Pressure mbar");
+BLEDescriptor pd = BLEDescriptor("2901", "Pressure; mbar/hPa");
 
-Adafruit_BME680 senzor = Adafruit_BME680();
-int tPreviousMillis = 0;
-int hPreviousMillis = 0;
-int pPreviousMillis = 0;
-int i = 0;
+Adafruit_BME680 atmosphereSensor = Adafruit_BME680();
+int previousMillis = 0, characteristicsIterator = 1;
 
-void blututSetup() {
+//Setting up tucked in the function
+void bluetoothLESetup() { 
+  bluetoothLE.setLocalName("ARDuino3");
 
-  blutut.setLocalName("ARDuino3");
+  bluetoothLE.setAdvertisedServiceUuid(ts.uuid());
+  bluetoothLE.addAttribute(ts);
+  bluetoothLE.addAttribute(tc);
+  bluetoothLE.addAttribute(td);
 
-  blutut.setAdvertisedServiceUuid(ts.uuid());
-  blutut.addAttribute(ts);
-  blutut.addAttribute(tc);
-  blutut.addAttribute(td);
+  bluetoothLE.setAdvertisedServiceUuid(hs.uuid());
+  bluetoothLE.addAttribute(hs);
+  bluetoothLE.addAttribute(hc);
+  bluetoothLE.addAttribute(hd);
 
-  blutut.setAdvertisedServiceUuid(hs.uuid());
-  blutut.addAttribute(hs);
-  blutut.addAttribute(hc);
-  blutut.addAttribute(hd);
+  bluetoothLE.setAdvertisedServiceUuid(ps.uuid());
+  bluetoothLE.addAttribute(ps);
+  bluetoothLE.addAttribute(pc);
+  bluetoothLE.addAttribute(pd);
 
-  blutut.setAdvertisedServiceUuid(ps.uuid());
-  blutut.addAttribute(ps);
-  blutut.addAttribute(pc);
-  blutut.addAttribute(pd);
+  bluetoothLE.setEventHandler(BLEConnected, connectToBLE);
+  bluetoothLE.setEventHandler(BLEDisconnected, disconnectFromBLE);
 
-  blutut.setEventHandler(BLEConnected, connectToBLE);
-  blutut.setEventHandler(BLEDisconnected, disconnectFromBLE);
-
-  blutut.begin();
-  Serial.println("setapovao");
+  bluetoothLE.begin();
+  Serial.println("Finished setting up the BLE.");
 }
 
-void sendValues(int t, int p, int h) {
-  tc.setValue(t);
- pc.setValue(p);
-  hc.setValue(h);
-  Serial.println("Poslao na BLE.");
-}
-
+//BLE connectivity checks and callbacks
 bool BLEconnected = false;
 void connectToBLE() {
   BLEconnected = true;
@@ -68,42 +84,57 @@ void disconnectFromBLE() {
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("EEEE");
-  blututSetup();
-  senzor.begin();
+  Serial.println("Started the firmware.");
+  bluetoothLESetup();
+  atmosphereSensor.begin();
 }
 
+//Most of the heavy  work that transfers data from sensors to a nearby connected device
+bool sensor2cloud()
+{
+  int currentMillis = millis();
+  //Burst of all options within 5 seconds, with 0.5 second pauses between options
+  if((currentMillis - previousMillis) < (5000 + (characteristicsIterator * 500)))
+    return false;
+ 
+  //If enough time has passed, get to work:
+  int Value;
+  
+  //getting from the proper sensor
+  switch(characteristicsIterator){ 
+    case 1: Value = int(atmosphereSensor.readTemperature()); Serial.print("Read temp: "); break;
+    case 2: Value = int(atmosphereSensor.readPressure()/100); Serial.print("Read pres: "); break;
+    case 3: Value = int(atmosphereSensor.readHumidity()); Serial.print("Read humi: "); break;
+  }
+  //Printing the decimal value for humans, and the hex (since it is stored in hex)
+  Serial.print(Value);
+  Serial.print(" hex: ");
+  Serial.println(Value, HEX);
+  
+  //sending to the proper characteristic
+  switch(characteristicsIterator){
+    case 1: tc.setValue(Value); break;
+    case 2: pc.setValue(Value); break;
+    case 3: hc.setValue(Value); break;
+  }  
+  
+  //If we've went through all of them, it's time to start over
+  if(characteristicsIterator == NO_OF_CHARS){
+    previousMillis = currentMillis;
+    characteristicsIterator = 0;
+    Serial.println("---------");
+  }
+  
+  characteristicsIterator++;
+  return true;
+}
+
+bool ok;
 void loop() {
-  blutut.poll();
-  int currentMilis = millis(); //How much time has passed
-  if (currentMilis - tPreviousMillis > 5500 && BLEconnected) //Not enough time since last time? skip.
-  {
-    int t = int(senzor.readTemperature());
-    tc.setValue(t);
-    Serial.print("Sent tc: ");
-    Serial.print(t, HEX);
-    Serial.print(" ");
-    Serial.println(t);
-    tPreviousMillis = currentMilis;
-  } 
-  if (currentMilis - pPreviousMillis > 6000 && BLEconnected)
-  {
-    int p = int(senzor.readPressure()/100);
-    pc.setValue(p);
-    Serial.print("Sent pc: ");
-    Serial.print(p, HEX);
-    Serial.print(" ");
-    Serial.println(p);
-    pPreviousMillis = currentMilis;
-  } 
-  if (currentMilis - hPreviousMillis > 6500 && BLEconnected)
-  {
-    int h = int(senzor.readHumidity());
-    hc.setValue(h);
-    Serial.print("Sent hc: ");
-    Serial.print(h, HEX);
-    Serial.print(" ");
-    Serial.println(h);
-    hPreviousMillis = currentMilis;
+  bluetoothLE.poll();
+  if(BLEconnected){
+    do
+      ok = sensor2cloud();
+    while(ok);
   }
 }
