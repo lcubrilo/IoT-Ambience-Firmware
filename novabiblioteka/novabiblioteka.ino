@@ -1,4 +1,4 @@
-/****************************************
+ /****************************************
  * Title:
  * Firmware for the Arduino MEGA board.
  * 
@@ -27,9 +27,11 @@
 //In this example we have 3 characteristics:
 //Temperature, pressure and humidity
 #define NO_OF_CHARS 3 
-
+#define PIN_REQ 46
+#define PIN_RDY 2
+#define PIN_RST  48
 //BLE setting up that couldn't have been tucked in the function
-BLEPeripheral bluetoothLE = BLEPeripheral(46, 2, 48);
+BLEPeripheral bluetoothLE = BLEPeripheral(PIN_REQ, PIN_RDY, PIN_RST);
 BLEService ts = BLEService("CCC0");
 BLEIntCharacteristic tc = BLEIntCharacteristic("CCC1", BLERead | BLENotify);
 BLEDescriptor td = BLEDescriptor("2901", "Temperature; Degrees Celsius");
@@ -75,11 +77,11 @@ void bluetoothLESetup() {
 bool BLEconnected = false;
 void connectToBLE() {
   BLEconnected = true;
-  Serial.println("\nPovezan.");
+  Serial.println("\nConnected.");
 }
 void disconnectFromBLE() {
   BLEconnected = false;
-  Serial.println("Odvezan.");
+  Serial.println("Disconnected.");
 }
 
 void setup() {
